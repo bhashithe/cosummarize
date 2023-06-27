@@ -11,6 +11,8 @@ with open('.key') as f:
 
 keys = ast.literal_eval(text)
 
+
+logging.basicConfig(filename='botlog.log', encoding='utf-8', level=logging.DEBUG, filemode='a', format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger()
 
 def summarize(url):
