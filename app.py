@@ -1,13 +1,14 @@
+from bs4 import BeautifulSoup
 from newspaper import Article
 import cohere
 import logging
 import ast
-import tweepy
-from urlextract import URLExtract
+from mastodon import Mastodon
 import time
 
 with open('.key') as f:
-    text = f.read()
+    text = f.read().strip()
+
 
 keys = ast.literal_eval(text)
 
@@ -31,16 +32,8 @@ def summarize(url):
     return response.summary
 
 def create_api():
-    consumer_key = keys["consumer_key"]
-    consumer_secret = keys["consumer_secret"]
-    access_token = keys["access_token"]
-    access_token_secret = keys["access_token_secret"]
-
-    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-    auth.set_access_token(access_token, access_token_secret)
-    api = tweepy.API(auth, wait_on_rate_limit=True)
     try:
-        api.verify_credentials()
+        api = Mastodon(access_token='summarizerbot_usercred.secret')
     except Exception as e:
         logger.error("Error creating API", exc_info=True)
         raise e
@@ -48,30 +41,32 @@ def create_api():
     return api
 
 
-def check_mentions(api, keywords, since_id):
+def check_mentions(api, since_id):
     logger.info("Retrieving mentions")
     new_since_id = since_id
-    for tweet in tweepy.Cursor(api.mentions_timeline, since_id=since_id).items():
-        new_since_id = max(tweet.id, new_since_id)
-        if tweet.in_reply_to_status_id is not None:
+
+    for notif in api.notifications(type['mention']):
+        new_since_id = max(notif['id'], since_id)
+        if notif['status']['in_reply_to_id'] is None:
             continue
-        url = extract_url(tweet.text)
-        logger.info(f"Answering to {tweet.user.name}")
+        url = extract_url(notif['status']['content'])
+        logger.info(f"Answering to {notif['account']}")
         summary = summarize(url)
-        api.update_status(
-            status=summary,
-            in_reply_to_status_id=tweet.id,
-        )
+        api.toot(summary, in_reply_to_id=notif['status']['id'])
+        time.sleep(61)
     with open('.lastid', 'w') as f:
         f.write(new_since_id)
 
-def extract_url(text):
+def extract_url(content):
     '''
     we shall only summarize first URL for now
     '''
-    extractor = URLExtract()
-    url = extractor.find_urls(text)
-    return url[0]
+    soup = BeautifulSoup(content)
+    try:
+        url = [a for a in soup.find_all('a') if a.get('class') is None]
+        return url[0]
+    except:
+        return None
 
 
 def main():
@@ -80,11 +75,13 @@ def main():
         since_id = int(f.read().strip())
 
     while True:
-        check_mentions(api, ["help", "support"], since_id)
+        check_mentions(api, since_id)
         logger.info("Waiting...")
         time.sleep(60)
 
 if __name__ == "__main__":
     main()
+
+    #api = create_api()
 
     
