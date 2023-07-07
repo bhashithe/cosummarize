@@ -9,6 +9,12 @@ import time
 with open('.key') as f:
     text = f.read().strip()
 
+'''
+TODO: Create a database of replied posts so that we do not repeat
+
+We can store the URL and the summary generated
+We can add control to the users to ask the bot to regenerate
+'''
 
 keys = ast.literal_eval(text)
 
