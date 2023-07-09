@@ -5,9 +5,7 @@ import logging
 import ast
 from mastodon import Mastodon
 import time
-
-with open('.key') as f:
-    text = f.read().strip()
+import sqlite3
 
 '''
 TODO: Create a database of replied posts so that we do not repeat
@@ -16,27 +14,40 @@ We can store the URL and the summary generated
 We can add control to the users to ask the bot to regenerate
 '''
 
+
+with open('.key') as f:
+    text = f.read().strip()
+
 keys = ast.literal_eval(text)
+
+conn = sqlite3.connect("database.db")
 
 
 logging.basicConfig(filename='botlog.log', encoding='utf-8', level=logging.DEBUG, filemode='a', format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger()
 
 def summarize(url):
-    print(url)
-    article = Article(url)
-    article.download()
-    article.parse()
-    text = article.text
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM mytable WHERE URL = ?', (url,))
+    result = cursor.fetchone()[0]
+    if result > 0:
+        article = Article(url)
+        article.download()
+        article.parse()
+        text = article.text
 
-    co = cohere.Client(keys['cohere'])
+        co = cohere.Client(keys['cohere'])
 
-    response = co.summarize(
-        text=text,
-        length='medium',
-        format='paragraph'
-    )
-    return response.summary
+        response = co.summarize(
+            text=text,
+            length='medium',
+            format='paragraph'
+        )
+        return response.summary
+    else:
+        cursor.execute('SELECT Text FROM mytable WHERE URL = ?', (url,))
+        result = cursor.fetchone()
+        return result[0]
 
 def create_api():
     try:
