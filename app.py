@@ -43,18 +43,16 @@ def summarize(url):
             format='paragraph'
         )
         cursor.execute('''
-                INSERT INTO mytable (URL, Text, Tries)
+                INSERT INTO generations (URL, Text, Tries)
                 VALUES (?, ?, ?)
                 ''', (url, response.summary, 0))
 
         # Save the changes and close the connection
         conn.commit()
-        conn.close()
         return response.summary
     else:
         cursor.execute('SELECT Text FROM generations WHERE URL = ?', (url,))
         result = cursor.fetchone()
-        conn.close()
         return result[0]
 
 def create_api():
