@@ -8,10 +8,8 @@ import time
 import sqlite3
 
 '''
-TODO: Create a database of replied posts so that we do not repeat
-
-We can store the URL and the summary generated
-We can add control to the users to ask the bot to regenerate
+TODO: 
+    - We can add control to the users to ask the bot to regenerate
 '''
 
 
@@ -28,9 +26,10 @@ logger = logging.getLogger()
 
 def summarize(url):
     cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) FROM mytable WHERE URL = ?', (url,))
+    cursor.execute('SELECT COUNT(*) FROM generations WHERE URL = ?', (url,))
     result = cursor.fetchone()[0]
-    if result > 0:
+    print(url)
+    if result == 0:
         article = Article(url)
         article.download()
         article.parse()
@@ -43,10 +42,19 @@ def summarize(url):
             length='medium',
             format='paragraph'
         )
+        cursor.execute('''
+                INSERT INTO mytable (URL, Text, Tries)
+                VALUES (?, ?, ?)
+                ''', (url, response.summary, 0))
+
+        # Save the changes and close the connection
+        conn.commit()
+        conn.close()
         return response.summary
     else:
-        cursor.execute('SELECT Text FROM mytable WHERE URL = ?', (url,))
+        cursor.execute('SELECT Text FROM generations WHERE URL = ?', (url,))
         result = cursor.fetchone()
+        conn.close()
         return result[0]
 
 def create_api():
