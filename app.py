@@ -24,7 +24,7 @@ conn = sqlite3.connect("database.db")
 logging.basicConfig(filename='botlog.log', encoding='utf-8', level=logging.DEBUG, filemode='a', format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger()
 
-def summarize(url):
+def summarize(url, calling):
     cursor = conn.cursor()
     cursor.execute('SELECT COUNT(*) FROM generations WHERE URL = ?', (url,))
     result = cursor.fetchone()[0]
@@ -43,9 +43,9 @@ def summarize(url):
             format='paragraph'
         )
         cursor.execute('''
-                INSERT INTO generations (URL, Text, Tries)
-                VALUES (?, ?, ?)
-                ''', (url, response.summary, 0))
+                INSERT INTO generations (URL, Text, Tries, Calling)
+                VALUES (?, ?, ?, ?)
+                ''', (url, response.summary, 0, calling))
 
         # Save the changes and close the connection
         conn.commit()
@@ -65,26 +65,22 @@ def create_api():
     return api
 
 
-def check_mentions(api, since_id):
+def check_mentions(api):
     logger.info("Retrieving mentions")
-    new_since_id = since_id if not since_id is None else -14
 
     for notif in api.notifications(types=['mention']):
-        new_since_id = max(notif['id'], since_id)
         if notif['status']['in_reply_to_id'] is None:
             continue
         content = api.status(notif['status']['in_reply_to_id'])
         url = extract_url(content['content'])
         logger.info(f"Answering to {notif['account']}")
         if url:
-            summary = summarize(url)
+            summary = summarize(url, notif['status']['id'])
             api.status_post(summary, in_reply_to_id=notif['status']['id'])
             time.sleep(61)
-            with open('.lastid', 'w') as f:
-                print(new_since_id)
-                f.write(f'{new_since_id}')
             logger.info("tooted a summary")
             continue
+    api.notifications_clear()
 
 def extract_url(content):
     '''
@@ -100,11 +96,10 @@ def extract_url(content):
 
 def main():
     api = create_api()
+    cursor = conn.cursor()
 
     while True:
-        with open('.lastid') as f:
-            since_id = int(f.read().strip())
-        check_mentions(api, since_id)
+        check_mentions(api)
         logger.info("Waiting...")
         time.sleep(60)
 
