@@ -10,7 +10,8 @@ def main():
         CREATE TABLE IF NOT EXISTS generations (
             URL TEXT,
             Text TEXT,
-            Tries INTEGER
+            Tries INTEGER,
+            Calling INTEGER
         )
     ''')
     conn.commit()
